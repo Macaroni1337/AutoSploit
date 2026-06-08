@@ -7,8 +7,13 @@ import random
 import platform
 import getpass
 import tempfile
-import readline
-import distutils.spawn
+try:
+    import readline
+    HAS_READLINE = True
+except ImportError:
+    # readline is not available on Windows; tab completion will be disabled
+    HAS_READLINE = False
+import shutil
 from subprocess import (
     PIPE,
     Popen
@@ -90,7 +95,8 @@ NMAP_POSSIBLE_PATHS = (
 )
 
 # link to the checksums
-CHECKSUM_LINK = open("{}/etc/text_files/checksum_link.txt".format(CUR_DIR)).read()
+with open("{}/etc/text_files/checksum_link.txt".format(CUR_DIR)) as _f:
+    CHECKSUM_LINK = _f.read()
 
 # path to the file containing all the discovered hosts
 HOST_FILE = "{}/hosts.txt".format(CUR_DIR)
@@ -112,7 +118,8 @@ START_SERVICES_PATH = "{}/etc/scripts/start_services.sh".format(CUR_DIR)
 RC_SCRIPTS_PATH = "{}/autosploit_out/".format(HOME)
 
 # path to the file that will contain our query
-QUERY_FILE_PATH = tempfile.NamedTemporaryFile(delete=False).name
+with tempfile.NamedTemporaryFile(delete=False) as _tmp:
+    QUERY_FILE_PATH = _tmp.name
 
 # default HTTP User-Agent
 DEFAULT_USER_AGENT = "AutoSploit/{} (Language=Python/{}; Platform={})".format(
@@ -128,17 +135,19 @@ AUTOSPLOIT_PROMPT = "\033[31m{}\033[0m@\033[36mautosploit\033[0m# ".format(getpa
 # all the paths to the API tokens
 API_KEYS = {
     "censys": ("{}/etc/tokens/censys.key".format(CUR_DIR), "{}/etc/tokens/censys.id".format(CUR_DIR)),
-    "shodan": ("{}/etc/tokens/shodan.key".format(CUR_DIR), )
+    "shodan": ("{}/etc/tokens/shodan.key".format(CUR_DIR), ),
+    # ZoomEye now uses a personal API key — no username/password required
+    "zoomeye": ("{}/etc/tokens/zoomeye.key".format(CUR_DIR), ),
 }
 
 # all the URLs that we will use while doing the searching
 API_URLS = {
+    # Shodan URL kept for reference; the ShodanAPIHook uses the official library instead
     "shodan": "https://api.shodan.io/shodan/host/search?key={token}&query={query}",
-    "censys": "https://censys.io/api/v1/search/ipv4",
-    "zoomeye": (
-        "https://api.zoomeye.org/user/login",
-        "https://api.zoomeye.org/web/search"
-    )
+    # Censys moved to v2 in 2021; v1 returns 404
+    "censys": "https://search.censys.io/api/v2/hosts/search",
+    # ZoomEye host search v2 endpoint (API key auth, no login required)
+    "zoomeye": "https://api.zoomeye.org/host/search",
 }
 
 # has msf been launched?
@@ -168,6 +177,8 @@ def load_external_commands():
     paths = ["/bin", "/usr/bin"]
     loaded_externals = []
     for f in paths:
+        if not os.path.isdir(f):
+            continue
         for cmd in os.listdir(f):
             if not os.path.isdir("{}/{}".format(f, cmd)):
                 loaded_externals.append(cmd)
@@ -196,6 +207,8 @@ def auto_completer(keywords):
     """
     function to initialize the auto complete utility
     """
+    if not HAS_READLINE:
+        return
     completer = AutoSploitCompleter(keywords)
     readline.set_completer(completer.complete_text)
     readline.parse_and_bind('tab: complete')
@@ -290,16 +303,22 @@ def load_api_keys(unattended=False, path="{}/etc/tokens".format(CUR_DIR)):
         if not os.path.isfile(API_KEYS[key][0]):
             access_token = lib.output.prompt("enter your {} API token".format(key.title()), lowercase=False)
             if key.lower() == "censys":
-                identity = lib.output.prompt("enter your {} ID".format(key.title()), lowercase=False)
+                identity = lib.output.prompt("enter your {} API secret".format(key.title()), lowercase=False)
                 with open(API_KEYS[key][1], "a+") as log:
                     log.write(identity)
             with open(API_KEYS[key][0], "a+") as log:
                 log.write(access_token.strip())
         else:
             lib.output.info("{} API token loaded from {}".format(key.title(), API_KEYS[key][0]))
+
+    def _read(p):
+        with open(p) as fh:
+            return fh.read().rstrip()
+
     api_tokens = {
-        "censys": (open(API_KEYS["censys"][0]).read().rstrip(), open(API_KEYS["censys"][1]).read().rstrip()),
-        "shodan": (open(API_KEYS["shodan"][0]).read().rstrip(), )
+        "censys": (_read(API_KEYS["censys"][0]), _read(API_KEYS["censys"][1])),
+        "shodan": (_read(API_KEYS["shodan"][0]), ),
+        "zoomeye": (_read(API_KEYS["zoomeye"][0]), ),
     }
     return api_tokens
 
@@ -333,7 +352,7 @@ def check_for_msf():
     """
     check the ENV PATH for msfconsole
     """
-    return os.getenv("msfconsole", False) or distutils.spawn.find_executable("msfconsole")
+    return os.getenv("msfconsole", False) or shutil.which("msfconsole")
 
 
 def logo():
@@ -465,9 +484,9 @@ def download_modules(link):
     lib.output.info('downloading: {}'.format(link))
     retval = ""
     req = requests.get(link)
-    content = req.content
+    content = req.text
     split_data = content.split(" ")
-    searcher = re.compile("exploit/\w+/\w+")
+    searcher = re.compile(r"exploit/\w+/\w+")
     storage_file = tempfile.NamedTemporaryFile(delete=False)
     for item in split_data:
         if searcher.search(item) is not None:

@@ -45,7 +45,7 @@ def checksum(issue_template_path):
             if not any(c in name for c in file_skips):
                 path = os.path.join(root, name)
                 check = hashlib.md5()
-                check.update(open(path).read())
+                check.update(open(path, 'rb').read())
                 check = check.hexdigest()
                 current_checksums.append("{}:{}".format(path.split("/")[-1], check))
     try:
@@ -77,7 +77,7 @@ def check_version_number(current_version):
     version_checker = re.compile(r"version.=.\S\d.\d.(\d)?", re.I)
     try:
         req = requests.get("https://raw.githubusercontent.com/NullArray/AutoSploit/master/lib/banner.py")
-        available_version = version_checker.search(req.content).group().split("=")[-1].split('"')[1]
+        available_version = version_checker.search(req.text).group().split("=")[-1].split('"')[1]
         if available_version > current_version:
             return False
         return True
@@ -106,7 +106,8 @@ def get_token(path):
         token, n = data.split(":")
         for _ in range(int(n)):
             token = base64.b64decode(token)
-    return token
+    # b64decode returns bytes in Python 3; callers expect a str
+    return token.decode("utf-8") if isinstance(token, bytes) else token
 
 
 def ensure_no_issue(param):
@@ -120,13 +121,8 @@ def ensure_no_issue(param):
     for url in urls:
         req = requests.get(url)
         param = re.compile(param)
-        try:
-            if param.search(req.content) is not None:
-                return True
-        except:
-            content = str(req.content)
-            if param.search(content) is not None:
-                return True
+        if param.search(req.text) is not None:
+            return True
     return False
 
 
@@ -203,7 +199,7 @@ def request_issue_creation(path, arguments, error_message):
     #    )
     #    exit(1)
 
-    question = raw_input(
+    question = input(
         "do you want to create an anonymized issue?[y/N]: "
     )
     if question.lower().startswith("y"):

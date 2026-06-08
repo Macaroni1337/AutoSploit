@@ -84,6 +84,25 @@ class AutoSploitParser(argparse.ArgumentParser):
                           help="only exploit hosts listed in the whitelist file")
         misc.add_argument("-D", "--download", nargs="+", metavar="SEARCH1 SEARCH2 ...", dest="downloadModules",
                           help="download new exploit modules with a provided search flag")
+        misc.add_argument("--safe", action="store_true", dest="safeMode",
+                          help="recon and module-selection only — exploitation modules are never fired (dry-run)")
+        misc.add_argument("--scope", metavar="PATH", dest="scopeFile",
+                          help="path to a scope file containing allowed IPs or CIDR ranges; "
+                               "targets outside scope are skipped")
+
+        rpc = parser.add_argument_group(
+            "msf rpc",
+            "use pymetasploit3 RPC instead of shelling out to msfconsole "
+            "(requires msfrpcd: msfrpcd -P PASSWORD -S -f)"
+        )
+        rpc.add_argument("--msf-rpc", action="store_true", dest="useMsfRpc",
+                         help="connect to a running msfrpcd instead of spawning msfconsole")
+        rpc.add_argument("--msf-rpc-host", metavar="HOST", dest="msfRpcHost", default="127.0.0.1",
+                         help="msfrpcd host (default: 127.0.0.1)")
+        rpc.add_argument("--msf-rpc-port", metavar="PORT", dest="msfRpcPort", default=55553, type=int,
+                         help="msfrpcd port (default: 55553)")
+        rpc.add_argument("--msf-rpc-pass", metavar="PASSWORD", dest="msfRpcPass", default="",
+                         help="msfrpcd password")
         opts = parser.parse_args()
         return opts
 
@@ -112,7 +131,7 @@ class AutoSploitParser(argparse.ArgumentParser):
         if opt.startExploit and opt.msfConfig is None:
             lib.settings.close(
                 "you must provide the configuration for metasploit in order to start the exploits "
-                "do so by passing the `-C\--config` switch (IE -C default 127.0.0.1 8080). don't be "
+                "do so by passing the `-C/--config` switch (IE -C default 127.0.0.1 8080). don't be "
                 "an idiot and keep in mind that sending connections back to your localhost is "
                 "probably not a good idea"
             )
@@ -188,34 +207,39 @@ class AutoSploitParser(argparse.ArgumentParser):
         if opt.searchCensys:
             lib.output.info(single_search_msg.format("Censys"))
             api_searches[2](
-                keys["censys"][1], keys["censys"][0],
-                opt.searchQuery, proxy=headers[0], agent=headers[1],
+                identity=keys["censys"][1], token=keys["censys"][0],
+                query=opt.searchQuery, proxy=headers[0], agent=headers[1],
                 save_mode=search_save_mode
             ).search()
         if opt.searchZoomeye:
             lib.output.info(single_search_msg.format("Zoomeye"))
             api_searches[0](
-                opt.searchQuery, proxy=headers[0], agent=headers[1],
+                token=keys["zoomeye"][0], query=opt.searchQuery,
+                proxy=headers[0], agent=headers[1],
                 save_mode=search_save_mode
             ).search()
         if opt.searchShodan:
             lib.output.info(single_search_msg.format("Shodan"))
             api_searches[1](
-                keys["shodan"][0], opt.searchQuery, proxy=headers[0], agent=headers[1],
+                token=keys["shodan"][0], query=opt.searchQuery,
+                proxy=headers[0], agent=headers[1],
                 save_mode=search_save_mode
             ).search()
         if opt.searchAll:
             lib.output.info("searching all search engines in order")
             api_searches[0](
-                opt.searchQuery, proxy=headers[0], agent=headers[1],
+                token=keys["zoomeye"][0], query=opt.searchQuery,
+                proxy=headers[0], agent=headers[1],
                 save_mode=search_save_mode
             ).search()
             api_searches[1](
-                keys["shodan"][0], opt.searchQuery, proxy=headers[0], agent=headers[1],
+                token=keys["shodan"][0], query=opt.searchQuery,
+                proxy=headers[0], agent=headers[1],
                 save_mode=search_save_mode
             ).search()
             api_searches[2](
-                keys["censys"][1], keys["censys"][0], opt.searchQuery, proxy=headers[0], agent=headers[1],
+                identity=keys["censys"][1], token=keys["censys"][0],
+                query=opt.searchQuery, proxy=headers[0], agent=headers[1],
                 save_mode=search_save_mode
             ).search()
         if opt.startExploit:
@@ -232,8 +256,14 @@ class AutoSploitParser(argparse.ArgumentParser):
                 hosts,
                 ruby_exec=opt.rubyExecutableNeeded,
                 msf_path=opt.pathToFramework,
-                dryRun=opt.dryRun,
+                dryRun=opt.dryRun or opt.safeMode,
                 shodan_token=keys["shodan"][0],
                 check_honey=check_pot,
-                compare_honey=opt.checkIfHoneypot
+                compare_honey=opt.checkIfHoneypot,
+                scope_file=opt.scopeFile,
+                safe_mode=opt.safeMode,
+                use_rpc=opt.useMsfRpc,
+                rpc_host=opt.msfRpcHost,
+                rpc_port=opt.msfRpcPort,
+                rpc_password=opt.msfRpcPass,
             ).start_exploit()

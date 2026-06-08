@@ -11,10 +11,7 @@ import api_calls.shodan
 import api_calls.zoomeye
 import api_calls.censys
 import lib.exploitation.exploiter
-try:
-    raw_input
-except:
-    input = raw_input
+# Python 3 compatibility — raw_input was removed; input() is the correct builtin
 
 
 class AutoSploitTerminal(object):
@@ -122,7 +119,7 @@ class AutoSploitTerminal(object):
         """
         get the provided choice and return a tuple of options and the choice
         """
-        original_choice = raw_input(lib.settings.AUTOSPLOIT_PROMPT)
+        original_choice = input(lib.settings.AUTOSPLOIT_PROMPT)
         try:
             choice_checker = original_choice.split(" ")[0]
         except:
@@ -190,12 +187,6 @@ class AutoSploitTerminal(object):
         Censys ->  reset/tokens censys <token> <userID>
         Shodan ->  reset.tokens shodan <token>
         """
-        import sys
-
-        if sys.version_info > (3,):
-            token = token.encode("utf-8")
-            username = username.encode("utf-8")
-
         if api.lower() == "censys":
             lib.output.info("resetting censys API credentials")
             with open(lib.settings.API_KEYS["censys"][0], 'w') as token_:
@@ -288,9 +279,11 @@ class AutoSploitTerminal(object):
                     "starting search on API {} using query: '{}'".format(api, query)
                 )
                 try:
+                    api_key = tokens.get(api.lower(), ("",))[0]
+                    api_identity = tokens["censys"][1] if api.lower() == "censys" else ""
                     self.api_call_pointers[api.lower()](
-                        token=tokens["shodan"][0] if api == "shodan" else tokens["censys"][0],
-                        identity=tokens["censys"][1] if api == "censys" else "",
+                        token=api_key,
+                        identity=api_identity,
                         query=query,
                         save_mode=save_mode,
                         proxy=proxy,
@@ -414,6 +407,23 @@ class AutoSploitTerminal(object):
                     lib.output.misc_info(mod.strip())
             lib.output.prompt("press enter to start exploitation phase")
             lib.output.info("starting exploitation phase")
+            scope_path = lib.output.prompt(
+                "enter path to scope file (IPs/CIDRs) or press enter to skip", lowercase=False
+            )
+            scope_path = scope_path.strip() if scope_path.strip() else None
+
+            use_rpc = lib.output.prompt(
+                "use pymetasploit3 RPC instead of msfconsole subprocess[y/N]", lowercase=True
+            ).startswith("y")
+            rpc_host = "127.0.0.1"
+            rpc_port = 55553
+            rpc_password = ""
+            if use_rpc:
+                rpc_host = lib.output.prompt("msfrpcd host", lowercase=False).strip() or "127.0.0.1"
+                rpc_port_raw = lib.output.prompt("msfrpcd port", lowercase=False).strip()
+                rpc_port = int(rpc_port_raw) if rpc_port_raw.isdigit() else 55553
+                rpc_password = lib.output.prompt("msfrpcd password", lowercase=False).strip()
+
             lib.exploitation.exploiter.AutoSploitExploiter(
                 configuration=workspace_info[0:3],
                 all_modules=mods_to_use,
@@ -421,7 +431,12 @@ class AutoSploitTerminal(object):
                 msf_path=msf_path,
                 ruby_exec=ruby_exec,
                 check_honey=workspace_info[-1],
-                shodan_token=shodan_token
+                shodan_token=shodan_token,
+                scope_file=scope_path,
+                use_rpc=use_rpc,
+                rpc_host=rpc_host,
+                rpc_port=rpc_port,
+                rpc_password=rpc_password,
             ).start_exploit()
 
     def do_load_custom_hosts(self, file_path):

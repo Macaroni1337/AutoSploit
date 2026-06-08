@@ -11,7 +11,7 @@ def generate_ip_range(selected_range):
     object that has IP `10.0.1.1 - 10.0.10.10` in it
     """
     octets = selected_range.split(".")
-    chunks = [map(int, octet.split("-")) for octet in octets]
+    chunks = [list(map(int, octet.split("-"))) for octet in octets]
     ranges = [range(c[0], c[1] + 1) if len(c) == 2 else c for c in chunks]
     for address in itertools.product(*ranges):
         yield ".".join(map(str, address))

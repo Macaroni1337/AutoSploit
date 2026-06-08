@@ -1,11 +1,8 @@
-import json
-
-import requests
+import shodan
 
 from lib.settings import start_animation
 from lib.errors import AutoSploitAPIConnectionError
 from lib.settings import (
-    API_URLS,
     HOST_FILE,
     write_to_file
 )
@@ -14,7 +11,9 @@ from lib.settings import (
 class ShodanAPIHook(object):
 
     """
-    Shodan API hook, saves us from having to install another dependency
+    Shodan API hook using the official shodan Python library (pip install shodan).
+    Replaces the previous raw-HTTP implementation for Python 3 compatibility and
+    to gain access to the library's built-in error handling and pagination.
     """
 
     def __init__(self, token=None, query=None, proxy=None, agent=None, save_mode=None, **kwargs):
@@ -27,21 +26,19 @@ class ShodanAPIHook(object):
 
     def search(self):
         """
-        connect to the API and grab all IP addresses associated with the provided query
+        Connect to the Shodan API via the official library and collect all IP
+        addresses that match the provided query.
         """
         start_animation("searching Shodan with given query '{}'".format(self.query))
         discovered_shodan_hosts = set()
         try:
-            req = requests.get(
-                API_URLS["shodan"].format(query=self.query, token=self.token),
-                proxies=self.proxy, headers=self.user_agent
-            )
-            json_data = json.loads(req.content)
-            for match in json_data["matches"]:
+            api = shodan.Shodan(self.token)
+            results = api.search(self.query)
+            for match in results["matches"]:
                 discovered_shodan_hosts.add(match["ip_str"])
             write_to_file(discovered_shodan_hosts, self.host_file, mode=self.save_mode)
             return True
+        except shodan.APIError as e:
+            raise AutoSploitAPIConnectionError(str(e))
         except Exception as e:
             raise AutoSploitAPIConnectionError(str(e))
-
-
