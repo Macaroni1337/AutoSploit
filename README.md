@@ -57,40 +57,55 @@ _**Operational Security:**_ Receiving callbacks on your local machine is not ide
 
 ### Kali Linux (recommended)
 
+Kali 2024+ uses Python 3.12/3.13 which enforces PEP 668 — direct `pip3 install` system-wide is blocked. You must use a virtual environment.
+
 ```bash
 # Clone this fork
 git clone https://github.com/Macaroni1337/AutoSploit.git
 cd AutoSploit
 
-# Install Python dependencies
-pip3 install -r requirements.txt
+# Install venv support if not already present
+sudo apt install python3-venv -y
 
-# Run (requires root)
-sudo python3 autosploit.py
+# Create a virtual environment inside the project folder
+python3 -m venv venv
+
+# Activate it
+source venv/bin/activate
+
+# Install dependencies inside the venv
+pip install -r requirements.txt
+
+# Run the tool (sudo needed for raw socket / service operations)
+sudo venv/bin/python3 autosploit.py
 ```
 
-If you are already running as root (common on Kali):
+> **Every new terminal session** requires `source venv/bin/activate` before running, or use the full path `sudo venv/bin/python3 autosploit.py` directly without activating.
+
+If you are running Kali as root (the default in many setups):
 
 ```bash
+source venv/bin/activate
 python3 autosploit.py
 ```
 
 ### Ubuntu / Debian
 
+Same venv requirement applies on Ubuntu 23.04+ and Debian 12+:
+
 ```bash
 git clone https://github.com/Macaroni1337/AutoSploit.git
 cd AutoSploit
 
-# Python 3.10+ is required — check your version first
-python3 --version
+sudo apt install python3-venv -y
+python3 -m venv venv
+source venv/bin/activate
 
-pip3 install -r requirements.txt
-sudo python3 autosploit.py
+pip install -r requirements.txt
+sudo venv/bin/python3 autosploit.py
 ```
 
 ### macOS
-
-macOS requires a virtual environment:
 
 ```bash
 git clone https://github.com/Macaroni1337/AutoSploit.git
@@ -107,11 +122,13 @@ sudo python autosploit.py
 
 ### Verifying the install
 
+With the venv active:
+
 ```bash
 python3 autosploit.py --help
 ```
 
-You should see the banner and full help output without any errors. If you see `ModuleNotFoundError`, run `pip3 install -r requirements.txt` again.
+You should see the banner and full help output without any errors. If you see `ModuleNotFoundError`, confirm the venv is active (`which python3` should point inside the `venv/` folder) and re-run `pip install -r requirements.txt`.
 
 ---
 
