@@ -1,5 +1,6 @@
 import shodan
 
+import lib.output
 from lib.settings import start_animation
 from lib.errors import AutoSploitAPIConnectionError
 from lib.settings import (
@@ -29,6 +30,9 @@ class ShodanAPIHook(object):
         Connect to the Shodan API via the official library and collect all IP
         addresses that match the provided query.
         """
+        if not self.token or str(self.token).strip().upper() == "NA":
+            lib.output.warning("Shodan API key not configured (NA) — skipping Shodan search")
+            return False
         start_animation("searching Shodan with given query '{}'".format(self.query))
         discovered_shodan_hosts = set()
         try:

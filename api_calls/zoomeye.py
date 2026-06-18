@@ -1,5 +1,6 @@
 import requests
 
+import lib.output
 from lib.settings import start_animation
 from lib.errors import AutoSploitAPIConnectionError
 from lib.settings import (
@@ -36,6 +37,9 @@ class ZoomEyeAPIHook(object):
         Connect to the ZoomEye v2 API and collect all IP addresses matching
         the provided query.
         """
+        if not self.token or str(self.token).strip().upper() == "NA":
+            lib.output.warning("ZoomEye API key not configured (NA) — skipping ZoomEye search")
+            return False
         start_animation("searching ZoomEye with given query '{}'".format(self.query))
         discovered_zoomeye_hosts = set()
         try:

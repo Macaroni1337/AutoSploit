@@ -36,6 +36,7 @@ _**Operational Security:**_ Receiving callbacks on your local machine is not ide
 | Censys client | v1 API (dead) | **v2 API** (`search.censys.io/api/v2`) |
 | ZoomEye client | Hardcoded shared credentials in repo | **Personal API key** from `etc/tokens/zoomeye.key` |
 | Metasploit | subprocess → msfconsole only | subprocess path kept + **pymetasploit3 RPC** as alternative |
+| API key requirement | All three required | **Type `NA` at any prompt** to skip that engine |
 | Authorisation gate | None | **Mandatory confirmation** before any exploit fires |
 | Safe / dry-run | `-d` skips MSF but exits immediately | **`--safe`** shows full plan without firing anything |
 | Scope control | Whitelist file (post-gather filter) | **`--scope`** CIDR/IP file filters before exploitation |
@@ -142,7 +143,39 @@ You need at least one search engine API key to gather hosts. AutoSploit will pro
 | **Censys** | [search.censys.io](https://search.censys.io) → Account → API | `etc/tokens/censys.key` (API Secret) + `etc/tokens/censys.id` (API ID) |
 | **ZoomEye** | [zoomeye.org](https://www.zoomeye.org) → Profile → API Key | `etc/tokens/zoomeye.key` |
 
-You can also create the files manually before first run to skip the prompts:
+### Skipping API keys (pentest / scope-only mode)
+
+If you already have a target list (e.g. a client-provided scope file) and do not need internet reconnaissance, you can skip any or all API key prompts by entering **`NA`** when asked:
+
+```
+[*] enter your Shodan API token (or type NA to skip this engine): NA
+[!] Shodan skipped — search engine will be unavailable
+```
+
+The `NA` sentinel is written to the token file so you are not prompted again on subsequent runs. Any engine whose key is set to `NA` will print a warning and skip cleanly — it will not attempt a connection or raise an error.
+
+To use the tool without any API keys, load targets manually instead:
+
+```bash
+# Interactive terminal
+sudo python3 autosploit.py
+> single 10.0.0.1,10.0.0.2,10.0.0.3
+
+# Or load from a file
+> custom /path/to/targets.txt
+```
+
+To re-enable a skipped engine later, delete its token file and restart — the prompt will appear again:
+
+```bash
+rm etc/tokens/shodan.key
+```
+
+---
+
+### Setting keys manually
+
+You can also create the files before first run to skip the interactive prompts:
 
 ```bash
 # Shodan

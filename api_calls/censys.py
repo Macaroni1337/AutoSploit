@@ -1,5 +1,6 @@
 import requests
 
+import lib.output
 import lib.settings
 from lib.errors import AutoSploitAPIConnectionError
 from lib.settings import (
@@ -37,6 +38,9 @@ class CensysAPIHook(object):
         provided query.  Results are paginated via cursor; collects up to 100
         hits per request (the API maximum).
         """
+        if not self.api_secret or str(self.api_secret).strip().upper() == "NA":
+            lib.output.warning("Censys API key not configured (NA) — skipping Censys search")
+            return False
         lib.settings.start_animation("searching Censys with given query '{}'".format(self.query))
         discovered_censys_hosts = set()
         try:

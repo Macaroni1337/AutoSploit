@@ -301,9 +301,18 @@ def load_api_keys(unattended=False, path="{}/etc/tokens".format(CUR_DIR)):
 
     for key in API_KEYS.keys():
         if not os.path.isfile(API_KEYS[key][0]):
-            access_token = lib.output.prompt("enter your {} API token".format(key.title()), lowercase=False)
+            access_token = lib.output.prompt(
+                "enter your {} API token (or type NA to skip this engine)".format(key.title()),
+                lowercase=False,
+            )
+            if access_token.strip().upper() == "NA":
+                # Write the sentinel so we don't prompt again on next run
+                with open(API_KEYS[key][0], "a+") as log:
+                    log.write("NA")
+                lib.output.warning("{} skipped — search engine will be unavailable".format(key.title()))
+                continue
             if key.lower() == "censys":
-                identity = lib.output.prompt("enter your {} API secret".format(key.title()), lowercase=False)
+                identity = lib.output.prompt("enter your {} API ID".format(key.title()), lowercase=False)
                 with open(API_KEYS[key][1], "a+") as log:
                     log.write(identity)
             with open(API_KEYS[key][0], "a+") as log:
@@ -312,6 +321,8 @@ def load_api_keys(unattended=False, path="{}/etc/tokens".format(CUR_DIR)):
             lib.output.info("{} API token loaded from {}".format(key.title(), API_KEYS[key][0]))
 
     def _read(p):
+        if not os.path.isfile(p):
+            return "NA"
         with open(p) as fh:
             return fh.read().rstrip()
 
